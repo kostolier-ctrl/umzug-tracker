@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <!-- viewport-fit=cover: страница занимает весь экран, включая область вокруг "чёлки" -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#17212b" media="(prefers-color-scheme: dark)">
+  <!-- Режим "На экран Домой": приложение откроется без панели Safari -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Umzug">
+  <title>Umzug-Tracker: документы для жизни в Германии</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+
+    <!-- Шапка как в чате: название по центру, под ним статус -->
+    <header class="topbar">
+      <h1>Документы в Германии</h1>
+      <p id="summary" class="topbar-sub">Список пуст</p>
+      <div class="progress" aria-hidden="true"><div id="progress-bar"></div></div>
+    </header>
+
+    <!-- Список как список чатов -->
+    <main id="scroll-area">
+      <div class="toolbar">
+        <input type="search" id="search" placeholder="Поиск по делам" autocomplete="off" aria-label="Поиск по делам">
+        <div class="chips" id="filters" role="group" aria-label="Фильтр по статусу">
+          <button type="button" data-filter="all" aria-pressed="true">Все</button>
+          <button type="button" data-filter="todo" aria-pressed="false">Не начато</button>
+          <button type="button" data-filter="progress" aria-pressed="false">В процессе</button>
+          <button type="button" data-filter="done" aria-pressed="false">Готово</button>
+        </div>
+        <div class="actions">
+          <button type="button" class="js-template">Шаблон: первые 3 месяца</button>
+          <button type="button" id="export-btn">Экспорт</button>
+          <button type="button" id="import-btn">Импорт</button>
+        </div>
+      </div>
+      <ul id="task-list"></ul>
+      <p id="no-match" class="no-match" hidden>Ничего не найдено</p>
+
+      <div id="empty" class="empty" hidden>
+        <svg viewBox="0 0 24 24" width="72" height="72" fill="none" stroke="currentColor"
+             stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="10"/><path d="M7.5 12.5l3 3 6-6.5"/>
+        </svg>
+        <h2>Пока ничего нет</h2>
+        <p>Напишите внизу первое дело, например Anmeldung.</p>
+        <button type="button" class="js-template cta">Добавить шаблон «Первые 3 месяца»</button>
+      </div>
+    </main>
+
+    <!-- Панель ввода как в мессенджере -->
+    <form id="task-form" class="composer">
+      <div id="edit-banner" class="edit-banner" hidden>
+        <span>Редактирование дела</span>
+        <button type="button" id="edit-cancel">Отмена</button>
+      </div>
+      <div id="details" class="details" hidden>
+        <label>
+          Дедлайн
+          <input type="date" id="deadline">
+        </label>
+        <label>
+          Что взять с собой (подсказка)
+          <select id="amt-select">
+            <option value="">Выберите ведомство…</option>
+          </select>
+          <span class="hint">Список подставится в заметку. Требования зависят от города и земли, уточняйте на сайте вашего ведомства.</span>
+        </label>
+        <label>
+          Заметка
+          <input type="text" id="note" placeholder="Какие документы взять, адрес ведомства" autocomplete="off">
+        </label>
+      </div>
+
+      <div class="composer-row">
+        <button type="button" id="details-toggle" class="icon-btn"
+                aria-label="Дедлайн и заметка" aria-expanded="false">
+          <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor"
+               stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/>
+          </svg>
+        </button>
+
+        <input type="text" id="title" placeholder="Новое дело" autocomplete="off" enterkeyhint="send">
+
+        <button type="submit" id="send-btn" class="send-btn" aria-label="Добавить" disabled>
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
+               stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 19V5M5 12l7-7 7 7"/>
+          </svg>
+        </button>
+      </div>
+    </form>
+
+  </div>
+
+  <input type="file" id="import-file" accept="application/json,.json" hidden>
+  <script src="script.js"></script>
+</body>
+</html>
