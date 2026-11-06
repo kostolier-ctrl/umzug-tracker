@@ -35,11 +35,6 @@
           <button type="button" data-filter="progress" aria-pressed="false">В процессе</button>
           <button type="button" data-filter="done" aria-pressed="false">Готово</button>
         </div>
-        <div class="actions">
-          <button type="button" class="js-template">Шаблон: первые 3 месяца</button>
-          <button type="button" id="export-btn">Экспорт</button>
-          <button type="button" id="import-btn">Импорт</button>
-        </div>
       </div>
       <ul id="task-list"></ul>
       <p id="no-match" class="no-match" hidden>Ничего не найдено</p>
@@ -50,13 +45,36 @@
           <circle cx="12" cy="12" r="10"/><path d="M7.5 12.5l3 3 6-6.5"/>
         </svg>
         <h2>Пока ничего нет</h2>
-        <p>Напишите внизу первое дело, например Anmeldung.</p>
-        <button type="button" class="js-template cta">Добавить шаблон «Первые 3 месяца»</button>
+        <p>Напишите первое дело внизу или добавьте шаблон кнопкой слева.</p>
       </div>
     </main>
 
     <!-- Панель ввода как в мессенджере -->
     <form id="task-form" class="composer">
+      <button type="button" class="fab fab-left js-template" aria-label="Шаблон: первые 3 месяца" title="Шаблон: первые 3 месяца">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 6h10M10 12h10M10 18h10M3.5 6.5l1.5 1.5 2.5-3M3.5 12.5l1.5 1.5 2.5-3M3.5 18.5l1.5 1.5 2.5-3"/></svg>
+      </button>
+      <div class="fab-menu">
+        <div id="menu" class="menu" role="menu" hidden>
+          <div class="menu-item menu-lang" style="--i:2">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg>
+            <span>Язык</span>
+            <div class="lang-seg" role="group" aria-label="Язык">
+              <button type="button" data-lang="ru" aria-pressed="true">RU</button>
+              <button type="button" data-lang="de" aria-pressed="false">DE</button>
+            </div>
+          </div>
+          <button type="button" role="menuitem" class="menu-item" id="import-btn" style="--i:1">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M8 11l4 4 4-4M5 13v6h14v-6"/></svg><span>Импорт из файла</span>
+          </button>
+          <button type="button" role="menuitem" class="menu-item" id="export-btn" style="--i:0">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4M8 8l4-4 4 4M5 13v6h14v-6"/></svg><span>Экспорт в файл</span>
+          </button>
+        </div>
+        <button type="button" id="menu-btn" class="fab" aria-label="Меню" aria-haspopup="menu" aria-expanded="false">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="19" cy="12" r="1.6" fill="currentColor"/></svg>
+        </button>
+      </div>
       <div id="edit-banner" class="edit-banner" hidden>
         <span>Редактирование дела</span>
         <button type="button" id="edit-cancel">Отмена</button>
@@ -71,7 +89,7 @@
           <select id="amt-select">
             <option value="">Выберите ведомство…</option>
           </select>
-          <span class="hint">Список подставится в заметку. Требования зависят от города и земли, уточняйте на сайте вашего ведомства.</span>
+          <span class="hint">Документы попадут в чек-лист дела. Требования зависят от города и земли, уточняйте на сайте вашего ведомства.</span>
         </label>
         <label>
           Заметка

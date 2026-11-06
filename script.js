@@ -2,6 +2,11 @@
 // Каждая задача: { id, title, deadline, note, status }
 // status: "todo" | "progress" | "done"
 const STORAGE_KEY = "umzug-tracker-tasks";
+const LANG_KEY = "umzug-tracker-lang";
+let lang = localStorage.getItem(LANG_KEY) || (navigator.language.startsWith("de") ? "de" : "ru");
+const T = (ru, de) => (lang === "de" ? de : ru); // выбор текста по языку
+const STATUS_DE = { todo: "Offen", progress: "In Arbeit", done: "Erledigt" };
+const statusLabel = (key) => T(STATUS_LABELS[key], STATUS_DE[key]);
 let query = "";          // текст поиска
 let filter = "all";      // фильтр по статусу
 let editingId = null;    // id дела, которое сейчас редактируем
@@ -97,7 +102,7 @@ function urgencyClass(task) {
 
 function formatShortDate(task) {
   if (!task.deadline) return "";
-  return new Date(task.deadline).toLocaleDateString("ru-RU", {
+  return new Date(task.deadline).toLocaleDateString(lang === "de" ? "de-DE" : "ru-RU", {
     day: "numeric",
     month: "short",
   });
@@ -108,11 +113,11 @@ function badgeFor(task) {
   if (task.status === "done") return null;
   const urgency = urgencyClass(task);
   const days = daysUntil(task.deadline);
-  if (urgency === "overdue") return { text: "Просрочено", color: "red" };
+  if (urgency === "overdue") return { text: T("Просрочено", "Überfällig"), color: "red" };
   if (urgency === "soon") {
-    return { text: days === 0 ? "Сегодня" : `${days} дн.`, color: "orange" };
+    return { text: days === 0 ? T("Сегодня", "Heute") : T(`${days} дн.`, `${days} Tg.`), color: "orange" };
   }
-  if (task.status === "progress") return { text: "В процессе", color: "blue" };
+  if (task.status === "progress") return { text: T("В процессе", "In Arbeit"), color: "blue" };
   return null;
 }
 
@@ -145,8 +150,8 @@ function render() {
 
   const doneCount = tasks.filter((t) => t.status === "done").length;
   summary.textContent = tasks.length
-    ? `Выполнено ${doneCount} из ${tasks.length}`
-    : "Список пуст";
+    ? T(`Выполнено ${doneCount} из ${tasks.length}`, `${doneCount} von ${tasks.length} erledigt`)
+    : T("Список пуст", "Liste ist leer");
   progressBar.style.width = tasks.length
     ? `${(doneCount / tasks.length) * 100}%`
     : "0";
@@ -173,7 +178,7 @@ function createTaskElement(task) {
   avatar.style.background = gradientFor(task.title);
   avatar.setAttribute(
     "aria-label",
-    task.status === "done" ? "Вернуть в работу" : "Отметить выполненным"
+    task.status === "done" ? T("Вернуть в работу", "Wieder öffnen") : T("Отметить выполненным", "Als erledigt markieren")
   );
   if (task.status === "done") {
     avatar.innerHTML = CHECK_ICON;
@@ -205,7 +210,7 @@ function createTaskElement(task) {
 
   const sub = document.createElement("span");
   sub.className = "task-sub";
-  sub.textContent = task.note || STATUS_LABELS[task.status];
+  sub.textContent = task.note || statusLabel(task.status);
 
   main.append(title, date, sub);
 
@@ -232,12 +237,12 @@ function createPanel(task) {
   const segmented = document.createElement("div");
   segmented.className = "segmented";
   segmented.setAttribute("role", "group");
-  segmented.setAttribute("aria-label", "Статус");
+  segmented.setAttribute("aria-label", T("Статус", "Status"));
 
   for (const [value, label] of Object.entries(STATUS_LABELS)) {
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.textContent = label;
+    btn.textContent = statusLabel(value);
     btn.setAttribute("aria-pressed", String(task.status === value));
     btn.addEventListener("click", () => changeStatus(task.id, value));
     segmented.appendChild(btn);
@@ -246,13 +251,13 @@ function createPanel(task) {
   const del = document.createElement("button");
   del.type = "button";
   del.className = "delete";
-  del.textContent = "Удалить";
+  del.textContent = T("Удалить", "Löschen");
   del.addEventListener("click", () => deleteTask(task.id));
 
   const edit = document.createElement("button");
   edit.type = "button";
   edit.className = "edit";
-  edit.textContent = "Изменить";
+  edit.textContent = T("Изменить", "Bearbeiten");
   edit.addEventListener("click", () => startEdit(task.id));
 
   panel.append(segmented);
@@ -292,7 +297,7 @@ function deleteTask(id) {
   const removed = tasks[index];
   tasks = tasks.filter((t) => t.id !== id);
   if (removed) {
-    showToast("Дело удалено", "Отменить", () => {
+    showToast(T("Дело удалено", "Aufgabe gelöscht"), T("Отменить", "Rückgängig"), () => {
       tasks.splice(index, 0, removed); // возвращаем на прежнее место
       saveTasks();
       render();
@@ -546,7 +551,7 @@ amtSelect.addEventListener("change", () => {
 
   const text = `${guide.label}: ${guide.tip}`;
   pendingDocs.push(...guide.docs.filter((d) => !pendingDocs.includes(d)));
-  showToast(`В чек-лист добавлено документов: ${guide.docs.length}`);
+  showToast(T(`В чек-лист добавлено документов: ${guide.docs.length}`, `Unterlagen zur Checkliste hinzugefügt: ${guide.docs.length}`));
   const current = noteInput.value.trim();
   // Если в заметке уже что-то есть, добавляем к ней через " | "
   noteInput.value = current ? `${current} | ${text}` : text;
@@ -628,7 +633,7 @@ function saveEdit() {
   task.docs = pendingDocs.map((text) => ({ text, done: doneByText.get(text) || false }));
   saveTasks();
   render();
-  showToast("Изменения сохранены");
+  showToast(T("Изменения сохранены", "Änderungen gespeichert"));
 }
 
 document.getElementById("edit-cancel").addEventListener("click", () => {
@@ -647,7 +652,8 @@ function createChecklist(task) {
 
   const head = document.createElement("div");
   head.className = "checklist-head";
-  head.textContent = `Документы: ${task.docs.filter((d) => d.done).length} из ${task.docs.length}`;
+  const doneDocs = task.docs.filter((d) => d.done).length;
+  head.textContent = T(`Документы: ${doneDocs} из ${task.docs.length}`, `Unterlagen: ${doneDocs} von ${task.docs.length}`);
   box.append(head);
 
   for (const doc of task.docs) {
@@ -704,7 +710,7 @@ const TEMPLATE_3_MONTHS = [
   ["Girokonto", "bank", 10],
   ["Anmeldung", "anmeldung", 14],
   ["Aufenthaltstitel", "auslaender", 30],
-  ["Steuer-ID (проверить почту)", "finanzamt", 30],
+  ["Steuer-ID", "finanzamt", 30],
   ["Rundfunkbeitrag", "rundfunk", 45],
   ["Kindergeld", "familienkasse", 60],
   ["Führerschein umschreiben", "fuehrerschein", 90],
@@ -730,7 +736,7 @@ function addTemplate() {
   });
   saveTasks();
   render();
-  showToast(added ? `Добавлено дел: ${added}` : "Все дела из шаблона уже в списке");
+  showToast(added ? T(`Добавлено дел: ${added}`, `Aufgaben hinzugefügt: ${added}`) : T("Все дела из шаблона уже в списке", "Alle Aufgaben der Vorlage sind schon in der Liste"));
 }
 
 document.querySelectorAll(".js-template").forEach((b) => b.addEventListener("click", addTemplate));
@@ -779,8 +785,101 @@ importFile.addEventListener("change", async () => {
     tasks = [...byId.values()];
     saveTasks();
     render();
-    showToast(`Импортировано дел: ${clean.length}`);
+    showToast(T(`Импортировано дел: ${clean.length}`, `Aufgaben importiert: ${clean.length}`));
   } catch {
-    showToast("Не удалось прочитать файл");
+    showToast(T("Не удалось прочитать файл", "Datei konnte nicht gelesen werden"));
   }
 });
+
+// ---------- 16. Меню "+" в шапке ----------
+const menuBtn = document.getElementById("menu-btn");
+const menu = document.getElementById("menu");
+
+function setMenuOpen(open) {
+  menu.hidden = !open;
+  menuBtn.setAttribute("aria-expanded", String(open));
+}
+
+menuBtn.addEventListener("click", () => setMenuOpen(menu.hidden));
+menu.addEventListener("click", (event) => {
+  if (event.target.closest("button")) setMenuOpen(false); // выбрали пункт, меню закрылось
+});
+document.addEventListener("pointerdown", (event) => {
+  if (!menu.hidden && !event.target.closest("#menu, #menu-btn")) setMenuOpen(false);
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") setMenuOpen(false);
+});
+
+// ---------- 17. Язык интерфейса: русский / немецкий ----------
+// Статичные тексты страницы: ключ = русский текст, значение = немецкий.
+// Тексты, которые строит JS, переводятся через T("русский", "немецкий").
+const DE = {
+  "Документы в Германии": "Dokumente in Deutschland",
+  "Поиск по делам": "Aufgaben suchen",
+  "Фильтр по статусу": "Nach Status filtern",
+  "Все": "Alle",
+  "Не начато": "Offen",
+  "В процессе": "In Arbeit",
+  "Готово": "Erledigt",
+  "Пока ничего нет": "Noch nichts da",
+  "Напишите первое дело внизу или добавьте шаблон кнопкой слева.": "Schreibe unten deine erste Aufgabe oder füge links die Vorlage hinzu.",
+  "Ничего не найдено": "Nichts gefunden",
+  "Редактирование дела": "Aufgabe bearbeiten",
+  "Отмена": "Abbrechen",
+  "Дедлайн": "Frist",
+  "Что взять с собой (подсказка)": "Was mitbringen (Tipp)",
+  "Выберите ведомство…": "Behörde wählen…",
+  "Документы попадут в чек-лист дела. Требования зависят от города и земли, уточняйте на сайте вашего ведомства.": "Die Unterlagen kommen in die Checkliste der Aufgabe. Anforderungen hängen von Stadt und Bundesland ab, prüfe die Website deiner Behörde.",
+  "Заметка": "Notiz",
+  "Какие документы взять, адрес ведомства": "Welche Unterlagen, Adresse der Behörde",
+  "Новое дело": "Neue Aufgabe",
+  "Дедлайн и заметка": "Frist und Notiz",
+  "Добавить": "Hinzufügen",
+  "Меню": "Menü",
+  "Шаблон: первые 3 месяца": "Vorlage: erste 3 Monate",
+  "Экспорт в файл": "Als Datei exportieren",
+  "Импорт из файла": "Aus Datei importieren",
+  "Язык": "Sprache",
+};
+
+// Проходим по тексту и атрибутам страницы и подставляем нужный язык.
+// Оригинал (русский) запоминаем в __ru, чтобы можно было вернуться обратно.
+function translateDom() {
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  for (let node; (node = walker.nextNode()); ) {
+    const ru = node.__ru || node.nodeValue.trim();
+    if (!DE[ru]) continue;
+    node.__ru = ru;
+    node.nodeValue = node.nodeValue.replace(node.nodeValue.trim(), lang === "de" ? DE[ru] : ru);
+  }
+  for (const el of document.querySelectorAll("[placeholder], [aria-label], [title]")) {
+    for (const attr of ["placeholder", "aria-label", "title"]) {
+      if (!el.hasAttribute(attr)) continue;
+      const ru = el["__ru_" + attr] || el.getAttribute(attr);
+      if (!DE[ru]) continue;
+      el["__ru_" + attr] = ru;
+      el.setAttribute(attr, lang === "de" ? DE[ru] : ru);
+    }
+  }
+}
+
+function applyLanguage() {
+  document.documentElement.lang = lang;
+  document.title = T("Umzug-Tracker: документы для жизни в Германии", "Umzug-Tracker: Unterlagen für das Leben in Deutschland");
+  document.querySelectorAll("[data-lang]").forEach((b) =>
+    b.setAttribute("aria-pressed", String(b.dataset.lang === lang))
+  );
+  translateDom();
+  render(); // карточки строятся из JS, поэтому перерисовываем
+}
+
+document.querySelectorAll("[data-lang]").forEach((btn) =>
+  btn.addEventListener("click", () => {
+    lang = btn.dataset.lang;
+    localStorage.setItem(LANG_KEY, lang);
+    applyLanguage();
+  })
+);
+
+applyLanguage();

@@ -452,19 +452,16 @@ ul {
   -webkit-appearance: none; appearance: none; transition: box-shadow .2s ease;
 }
 #search:focus { outline: none; box-shadow: 0 0 0 2px var(--accent), 0 6px 18px rgba(51, 144, 236, .22); }
-.chips, .actions { display: flex; gap: .4rem; }
+.chips { display: flex; gap: .4rem; }
 .chips { overflow-x: auto; scrollbar-width: none; }
 .chips::-webkit-scrollbar { display: none; }
-.actions { flex-wrap: wrap; }
-.chips button, .actions button, .cta {
+.chips button {
   position: relative; overflow: hidden; flex: none; min-height: 36px;
   padding: 0 .9rem; border-radius: 999px; background: var(--card);
   color: var(--sub); font-size: .85rem;
 }
-.actions button { color: var(--accent-text); }
 .chips button[aria-pressed="true"] { background: var(--accent); color: #fff; font-weight: 600; }
-.chips button:active, .actions button:active, .cta:active { transform: scale(.94); }
-.cta { margin-top: .8rem; min-height: 44px; padding: 0 1.2rem; background: var(--accent); color: #fff; font-weight: 600; font-size: .95rem; }
+.chips button:active { transform: scale(.94); }
 .no-match { margin: 0; padding: 2rem 1rem; text-align: center; color: var(--sub); }
 
 .edit { position: relative; overflow: hidden; min-height: 44px; color: var(--accent-text); font-weight: 500; border-radius: var(--radius-sm); }
@@ -487,3 +484,35 @@ ul {
 }
 #toast.show { opacity: 1; pointer-events: auto; transform: translate(-50%, 0); }
 #toast button { padding: .2rem .4rem; color: #6ab3f3; font-weight: 600; }
+
+/* ---------- Плавающие кнопки над панелью ввода ---------- */
+ul { padding-bottom: 4.5rem; }   /* последняя карточка не прячется под кнопками */
+.fab {
+  position: absolute; top: -54px; width: 44px; height: 44px; border-radius: 50%;
+  display: grid; place-items: center; overflow: hidden;
+  background: var(--card); color: var(--accent-text);
+  box-shadow: 0 4px 14px rgba(20, 30, 50, .18);
+}
+.fab:active { transform: scale(.88); }
+.fab-left { left: .7rem; }
+.fab-menu { position: absolute; right: .7rem; top: -54px; width: 44px; height: 44px; }
+.fab-menu .fab { position: static; }
+.fab-menu .fab svg { transition: transform .25s var(--spring); }
+.fab-menu .fab[aria-expanded="true"] svg { transform: rotate(90deg); }
+
+/* Меню раскрывается вверх каскадом: пункты появляются по очереди */
+.menu { position: absolute; right: 0; bottom: calc(100% + 10px); display: grid; gap: 8px; justify-items: end; width: max-content; }
+.menu-item {
+  position: relative; overflow: hidden; display: flex; align-items: center; gap: .6rem;
+  min-height: 44px; padding: 0 16px 0 14px; border-radius: 22px;
+  background: var(--card); color: var(--text); font-size: .95rem; white-space: nowrap;
+  box-shadow: 0 4px 14px rgba(20, 30, 50, .18);
+}
+.menu-item svg { flex: none; color: var(--accent-text); }
+button.menu-item:active { background: var(--press); }
+.menu:not([hidden]) .menu-item { animation: cascade .3s var(--spring) both; animation-delay: calc(var(--i) * 60ms); }
+.menu-lang { padding-right: 6px; }
+.lang-seg { display: flex; gap: 3px; padding: 3px; margin-left: .5rem; border-radius: 16px; background: var(--field); }
+.lang-seg button { position: relative; overflow: hidden; min-width: 44px; min-height: 34px; border-radius: 13px; font-size: .85rem; font-weight: 600; color: var(--sub); }
+.lang-seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+@keyframes cascade { from { opacity: 0; transform: translateY(16px) scale(.9); } }
