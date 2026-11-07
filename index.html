@@ -20,6 +20,7 @@
 
     <!-- Шапка как в чате: название по центру, под ним статус -->
     <header class="topbar">
+      <time id="today" class="date-pill"></time>
       <h1>Документы в Германии</h1>
       <p id="summary" class="topbar-sub">Список пуст</p>
       <div class="progress" aria-hidden="true"><div id="progress-bar"></div></div>
@@ -29,11 +30,14 @@
     <main id="scroll-area">
       <div class="toolbar">
         <input type="search" id="search" placeholder="Поиск по делам" autocomplete="off" aria-label="Поиск по делам">
-        <div class="chips" id="filters" role="group" aria-label="Фильтр по статусу">
+        <div class="filters-row">
+          <div class="chips" id="filters" role="group" aria-label="Фильтр по статусу">
           <button type="button" data-filter="all" aria-pressed="true">Все</button>
           <button type="button" data-filter="todo" aria-pressed="false">Не начато</button>
           <button type="button" data-filter="progress" aria-pressed="false">В процессе</button>
           <button type="button" data-filter="done" aria-pressed="false">Готово</button>
+        </div>
+          <button type="button" id="clear-btn" class="clear-btn" aria-label="Очистить все задачи" title="Очистить все задачи" disabled><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg></button>
         </div>
       </div>
       <ul id="task-list"></ul>

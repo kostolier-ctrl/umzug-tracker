@@ -516,3 +516,20 @@ button.menu-item:active { background: var(--press); }
 .lang-seg button { position: relative; overflow: hidden; min-width: 44px; min-height: 34px; border-radius: 13px; font-size: .85rem; font-weight: 600; color: var(--sub); }
 .lang-seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
 @keyframes cascade { from { opacity: 0; transform: translateY(16px) scale(.9); } }
+
+/* ---------- Дата в шапке и кнопка "Очистить" ---------- */
+.date-pill {
+  display: inline-flex; align-items: center; gap: .45rem; margin-bottom: .35rem;
+  padding: .22rem .75rem; border-radius: 999px;
+  background: rgba(51, 144, 236, .12); color: var(--accent-text);
+  font-size: .78rem; font-weight: 600; line-height: 1.3;
+}
+.date-pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.filters-row { display: flex; align-items: center; gap: .5rem; }
+.filters-row .chips { flex: 1; min-width: 0; }
+.clear-btn {
+  position: relative; overflow: hidden; flex: none; width: 36px; height: 36px; border-radius: 50%;
+  display: grid; place-items: center; background: var(--card); color: var(--red);
+}
+.clear-btn:active { transform: scale(.88); }
+.clear-btn:disabled { opacity: .35; cursor: default; }

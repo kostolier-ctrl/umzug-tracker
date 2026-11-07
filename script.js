@@ -147,6 +147,7 @@ function render() {
 
   emptyMessage.hidden = tasks.length > 0;
   noMatch.hidden = !(tasks.length > 0 && sorted.length === 0);
+  document.getElementById("clear-btn").disabled = tasks.length === 0;
 
   const doneCount = tasks.filter((t) => t.status === "done").length;
   summary.textContent = tasks.length
@@ -841,6 +842,7 @@ const DE = {
   "Экспорт в файл": "Als Datei exportieren",
   "Импорт из файла": "Aus Datei importieren",
   "Язык": "Sprache",
+  "Очистить все задачи": "Alle Aufgaben löschen",
 };
 
 // Проходим по тексту и атрибутам страницы и подставляем нужный язык.
@@ -871,6 +873,7 @@ function applyLanguage() {
     b.setAttribute("aria-pressed", String(b.dataset.lang === lang))
   );
   translateDom();
+  updateDate();
   render(); // карточки строятся из JS, поэтому перерисовываем
 }
 
@@ -883,3 +886,43 @@ document.querySelectorAll("[data-lang]").forEach((btn) =>
 );
 
 applyLanguage();
+
+// ---------- 18. Очистить все задачи (с возможностью отмены) ----------
+document.getElementById("clear-btn").addEventListener("click", () => {
+  if (!tasks.length) return;
+  const backup = tasks;
+  tasks = [];
+  expandedId = null;
+  saveTasks();
+  render();
+  showToast(T("Все дела удалены", "Alle Aufgaben gelöscht"), T("Отменить", "Rückgängig"), () => {
+    tasks = backup;
+    saveTasks();
+    render();
+  });
+});
+
+// ---------- 19. Актуальная дата в шапке ----------
+// Дата берётся из часов устройства (new Date()), поэтому всегда совпадает с телефоном или компьютером.
+// Проверяем каждые 30 секунд, при возврате на вкладку и при фокусе окна:
+// так дата обновится в полночь, после сна устройства или при смене часового пояса.
+var shownDay; // var, чтобы переменная существовала уже при первом вызове updateDate()
+
+function updateDate() {
+  const now = new Date();
+  const dayKey = now.toLocaleDateString("sv-SE"); // ГГГГ-ММ-ДД по местному времени
+  const label = now.toLocaleDateString(lang === "de" ? "de-DE" : "ru-RU", {
+    weekday: "short",
+    day: "numeric",
+    month: "long",
+  });
+  const el = document.getElementById("today");
+  el.textContent = label.charAt(0).toUpperCase() + label.slice(1);
+  el.dateTime = dayKey;
+  if (shownDay && shownDay !== dayKey) render(); // наступил новый день: пересчитать дедлайны
+  shownDay = dayKey;
+}
+
+setInterval(updateDate, 30000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) updateDate(); });
+window.addEventListener("focus", updateDate);
