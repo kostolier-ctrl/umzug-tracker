@@ -3,7 +3,7 @@
 // status: "todo" | "progress" | "done"
 const STORAGE_KEY = "umzug-tracker-tasks";
 const LANG_KEY = "umzug-tracker-lang";
-let lang = localStorage.getItem(LANG_KEY) || (navigator.language.startsWith("de") ? "de" : "ru");
+let lang = safeGet(LANG_KEY) || (navigator.language.startsWith("de") ? "de" : "ru");
 const T = (ru, de) => (lang === "de" ? de : ru); // выбор текста по языку
 const STATUS_DE = { todo: "Offen", progress: "In Arbeit", done: "Erledigt" };
 const statusLabel = (key) => T(STATUS_LABELS[key], STATUS_DE[key]);
@@ -26,7 +26,15 @@ function loadTasks() {
 }
 
 function saveTasks() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+  } catch {
+    // память браузера переполнена или отключена (например, приватный режим)
+    if (!saveWarned) {
+      saveWarned = true;
+      showToast(T("Не удалось сохранить данные. Сделайте экспорт в файл.", "Speichern fehlgeschlagen. Exportiere deine Daten als Datei."));
+    }
+  }
 }
 
 // ---------- 2. Элементы страницы ----------
@@ -86,7 +94,7 @@ function daysUntil(dateString) {
   if (!dateString) return null;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const due = new Date(dateString);
+  const due = parseLocalDate(dateString);
   due.setHours(0, 0, 0, 0);
   return Math.round((due - today) / 86400000); // 86400000 мс = 1 день
 }
@@ -102,7 +110,7 @@ function urgencyClass(task) {
 
 function formatShortDate(task) {
   if (!task.deadline) return "";
-  return new Date(task.deadline).toLocaleDateString(lang === "de" ? "de-DE" : "ru-RU", {
+  return parseLocalDate(task.deadline).toLocaleDateString(lang === "de" ? "de-DE" : "ru-RU", {
     day: "numeric",
     month: "short",
   });
@@ -211,7 +219,7 @@ function createTaskElement(task) {
 
   const sub = document.createElement("span");
   sub.className = "task-sub";
-  sub.textContent = task.note || statusLabel(task.status);
+  sub.textContent = task.note || tipsOf(task) || statusLabel(task.status);
 
   main.append(title, date, sub);
 
@@ -344,7 +352,7 @@ form.addEventListener("submit", (event) => {
 });
 
 // ---------- 7. Старт ----------
-render();
+// Первая отрисовка делается в конце файла, в applyLanguage().
 
 // ---------- 8. Подсказки: что взять с собой в ведомство ----------
 // Дополнительная возможность: выбираете ведомство в списке,
@@ -532,30 +540,16 @@ const amtSelect = document.getElementById("amt-select");
 // flatMap склеивает списки всех групп в один плоский массив
 const ALL_GUIDES = AMT_GUIDES.flatMap((section) => section.items);
 
-// Заполняем выпадающий список: группы (optgroup) и пункты (option)
-for (const section of AMT_GUIDES) {
-  const group = document.createElement("optgroup");
-  group.label = section.group;
-  for (const item of section.items) {
-    const option = document.createElement("option");
-    option.value = item.id;
-    option.textContent = item.label;
-    group.appendChild(option);
-  }
-  amtSelect.appendChild(group);
-}
 
 // При выборе ведомства подставляем текст в заметку
 amtSelect.addEventListener("change", () => {
   const guide = ALL_GUIDES.find((g) => g.id === amtSelect.value);
   if (!guide) return;
 
-  const text = `${guide.label}: ${guide.tip}`;
-  pendingDocs.push(...guide.docs.filter((d) => !pendingDocs.includes(d)));
+  // В чек-лист кладём ссылки на документы (id:номер), а не готовый текст: так он переводится
+  const keys = guide.docs.map((_, i) => `${guide.id}:${i}`);
+  pendingDocs.push(...keys.filter((k) => !pendingDocs.includes(k)));
   showToast(T(`В чек-лист добавлено документов: ${guide.docs.length}`, `Unterlagen zur Checkliste hinzugefügt: ${guide.docs.length}`));
-  const current = noteInput.value.trim();
-  // Если в заметке уже что-то есть, добавляем к ней через " | "
-  noteInput.value = current ? `${current} | ${text}` : text;
 
   amtSelect.value = ""; // сбрасываем выбор, чтобы можно было добавить ещё одно ведомство
 });
@@ -657,6 +651,19 @@ function createChecklist(task) {
   head.textContent = T(`Документы: ${doneDocs} из ${task.docs.length}`, `Unterlagen: ${doneDocs} von ${task.docs.length}`);
   box.append(head);
 
+  for (const g of guidesOf(task)) {
+    const info = document.createElement("div");
+    info.className = "checklist-tip";
+    info.append(`${guideLabel(g)}: ${guideTip(g)} `);
+    const link = document.createElement("a");
+    link.href = GUIDE_URLS[g.id];
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.textContent = T("Официальный сайт", "Offizielle Website");
+    info.append(link, ` · ${T(`Данные на ${GUIDES_UPDATED}`, `Stand: ${GUIDES_UPDATED}`)}`);
+    box.append(info);
+  }
+
   for (const doc of task.docs) {
     const label = document.createElement("label");
     const box1 = document.createElement("input");
@@ -668,7 +675,7 @@ function createChecklist(task) {
       render();
     });
     const text = document.createElement("span");
-    text.textContent = doc.text;
+    text.textContent = docLabel(doc.text);
     label.append(box1, text);
     box.append(label);
   }
@@ -676,16 +683,16 @@ function createChecklist(task) {
 }
 
 // ---------- 13. Уведомление (с кнопкой "Отменить") ----------
-let toastTimer;
 function showToast(text, actionLabel, onAction) {
-  let toast = document.getElementById("toast");
-  if (!toast) {
-    toast = document.createElement("div");
-    toast.id = "toast";
-    toast.setAttribute("role", "status");
-    document.body.appendChild(toast);
+  let box = document.getElementById("toasts");
+  if (!box) {
+    box = document.createElement("div");
+    box.id = "toasts";
+    box.setAttribute("role", "status");
+    document.body.appendChild(box);
   }
-  toast.replaceChildren();
+  const toast = document.createElement("div");
+  toast.className = "toast";
   const span = document.createElement("span");
   span.textContent = text;
   toast.append(span);
@@ -693,15 +700,12 @@ function showToast(text, actionLabel, onAction) {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.textContent = actionLabel;
-    btn.addEventListener("click", () => {
-      onAction();
-      toast.classList.remove("show");
-    });
+    btn.addEventListener("click", () => { onAction(); toast.remove(); });
     toast.append(btn);
   }
-  toast.classList.add("show");
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => toast.classList.remove("show"), 5000);
+  box.append(toast);
+  while (box.children.length > 3) box.firstElementChild.remove(); // не больше трёх сразу
+  setTimeout(() => toast.remove(), actionLabel ? 6000 : 4000);
 }
 
 // ---------- 14. Шаблон "Первые 3 месяца в Германии" ----------
@@ -729,9 +733,9 @@ function addTemplate() {
       id: Date.now() + i,
       title,
       deadline: due.toLocaleDateString("sv-SE"), // формат ГГГГ-ММ-ДД
-      note: `${guide.label}: ${guide.tip}`,
+      note: "",
       status: "todo",
-      docs: guide.docs.map((text) => ({ text, done: false })),
+      docs: guide.docs.map((_, i) => ({ text: `${guide.id}:${i}`, done: false })),
     });
     added++;
   });
@@ -751,6 +755,7 @@ document.getElementById("export-btn").addEventListener("click", () => {
   link.href = URL.createObjectURL(blob);
   link.download = `umzug-tracker-${new Date().toLocaleDateString("sv-SE")}.json`;
   link.click();
+  safeSet(EXPORT_KEY, String(Date.now())); // для напоминания о резервной копии
   setTimeout(() => URL.revokeObjectURL(link.href), 1000);
 });
 
@@ -779,7 +784,7 @@ importFile.addEventListener("change", async () => {
   if (!file) return;
   try {
     const data = JSON.parse(await file.text());
-    const clean = (Array.isArray(data) ? data : []).map(cleanTask).filter(Boolean);
+    const clean = (Array.isArray(data) ? data : []).map(cleanTask).filter(Boolean).map(migrateTask);
     if (!clean.length) throw new Error("нет дел");
     const byId = new Map(tasks.map((t) => [t.id, t])); // совпадающие id заменяются
     clean.forEach((t) => byId.set(t.id, t));
@@ -796,21 +801,136 @@ importFile.addEventListener("change", async () => {
 const menuBtn = document.getElementById("menu-btn");
 const menu = document.getElementById("menu");
 
-function setMenuOpen(open) {
+function setMenuOpen(open, returnFocus = false) {
   menu.hidden = !open;
   menuBtn.setAttribute("aria-expanded", String(open));
+  if (!open && returnFocus) menuBtn.focus(); // фокус возвращается на кнопку
 }
 
-menuBtn.addEventListener("click", () => setMenuOpen(menu.hidden));
+menuBtn.addEventListener("click", (event) => {
+  setMenuOpen(menu.hidden);
+  if (!menu.hidden && event.detail === 0) menu.querySelector("button").focus(); // открыли с клавиатуры
+});
 menu.addEventListener("click", (event) => {
-  if (event.target.closest("button")) setMenuOpen(false); // выбрали пункт, меню закрылось
+  if (event.target.closest("button")) setMenuOpen(false, true); // выбрали пункт, меню закрылось
 });
 document.addEventListener("pointerdown", (event) => {
   if (!menu.hidden && !event.target.closest("#menu, #menu-btn")) setMenuOpen(false);
 });
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape") setMenuOpen(false);
+  if (event.key === "Escape" && !menu.hidden) setMenuOpen(false, true);
 });
+
+// ---------- 16б. Подсказки на двух языках ----------
+// Дела хранят только ссылки вида "anmeldung:0" (ведомство:номер документа).
+// Текст берётся из данных на нужном языке, поэтому переключение RU/DE переводит всё.
+var saveWarned = false;
+const REF_RE = /^([a-z]+):(\d+)$/;
+const GUIDES_UPDATED = "11/2026";   // обновляйте после проверки списков на сайтах ведомств
+const GROUP_DE = { "Основные ведомства": "Wichtigste Behörden", "Дополнительно": "Weitere" };
+const GUIDE_URLS = {
+  anmeldung: "https://verwaltung.bund.de", auslaender: "https://www.make-it-in-germany.com",
+  finanzamt: "https://www.bzst.de", krankenkasse: "https://www.gkv-spitzenverband.de",
+  arbeitsagentur: "https://www.arbeitsagentur.de", jobcenter: "https://www.arbeitsagentur.de",
+  familienkasse: "https://www.arbeitsagentur.de", standesamt: "https://verwaltung.bund.de",
+  fuehrerschein: "https://www.kba.de", kfz: "https://www.kba.de", bank: "https://www.bafin.de",
+  rundfunk: "https://www.rundfunkbeitrag.de", schule: "https://www.kmk.org",
+};
+// Порядок документов совпадает с русскими списками в AMT_GUIDES
+const GUIDES_DE = {
+  anmeldung: { label: "Einwohnermeldeamt (Anmeldung)", tip: "Frist: 14 Tage nach dem Einzug.",
+    docs: ["Reisepass oder Personalausweis", "Wohnungsgeberbestätigung (vom Vermieter)", "ausgefülltes Anmeldeformular", "Mietvertrag (falls verlangt)", "Heirats- und Geburtsurkunden der Kinder (bei Umzug mit Familie)"] },
+  auslaender: { label: "Ausländerbehörde (Aufenthaltstitel)", tip: "Termin früh buchen. EU-Bürger brauchen meist keinen.",
+    docs: ["Reisepass und Visum", "Anmeldebestätigung", "biometrisches Passfoto", "Mietvertrag", "Nachweis der Krankenversicherung", "Arbeitsvertrag, Immatrikulationsbescheinigung oder Nachweis der Mittel", "ausgefüllter Antrag", "Geld für die Gebühr"] },
+  finanzamt: { label: "Finanzamt (Steuern)", tip: "Die Steuer-ID braucht dein Arbeitgeber.",
+    docs: ["Die Steuer-ID kommt nach der Anmeldung automatisch per Post, innerhalb weniger Wochen", "Selbstständige: Fragebogen zur steuerlichen Erfassung (über ELSTER)", "Gewerbeanmeldung, falls vorhanden", "Reisepass und Anmeldebestätigung"] },
+  krankenkasse: { label: "Krankenkasse (Krankenversicherung)", tip: "Krankenversicherung ist in Deutschland Pflicht.",
+    docs: ["Reisepass", "Anmeldebestätigung", "Arbeitsvertrag oder Immatrikulationsbescheinigung", "Versicherungsnachweis aus dem Herkunftsland oder EHIC", "Sozialversicherungsnummer, falls schon vorhanden", "IBAN"] },
+  arbeitsagentur: { label: "Agentur für Arbeit (Jobsuche)", tip: "Melde dich so früh wie möglich arbeitsuchend.",
+    docs: ["Reisepass", "Aufenthaltstitel (für Nicht-EU-Bürger)", "Anmeldebestätigung", "Lebenslauf", "Zeugnisse und Arbeitszeugnisse", "Steuer-ID und IBAN"] },
+  jobcenter: { label: "Jobcenter (Bürgergeld)", tip: "Der Anspruch hängt vom Aufenthaltsstatus ab.",
+    docs: ["Reisepass", "Aufenthaltstitel", "Anmeldebestätigung", "Mietvertrag", "Kontoauszüge der letzten 3 Monate", "Nachweis über Einkommen und Vermögen", "Nachweis der Krankenversicherung"] },
+  familienkasse: { label: "Familienkasse (Kindergeld)", tip: "Früh beantragen: rückwirkend wird nur begrenzt gezahlt.",
+    docs: ["ausgefüllter Antrag auf Kindergeld", "Steuer-ID der Eltern und Kinder", "Geburtsurkunden der Kinder", "Anmeldebestätigung", "Aufenthaltstitel (falls erforderlich)", "IBAN"] },
+  standesamt: { label: "Standesamt (Heirat, Geburt)", tip: "Übersetzungen macht ein beeidigter Übersetzer.",
+    docs: ["Reisepässe", "Geburtsurkunde (oft mit Apostille)", "Ehefähigkeitszeugnis, Ledigkeitsbescheinigung oder Scheidungsurteil", "Meldebescheinigung", "beglaubigte Übersetzung der Dokumente"] },
+  fuehrerschein: { label: "Führerscheinstelle (Führerschein)", tip: "Führerscheine aus Nicht-EU-Ländern gelten meist nur 6 Monate nach der Anmeldung.",
+    docs: ["Reisepass", "Anmeldebestätigung", "Original-Führerschein und beglaubigte Übersetzung", "biometrisches Passfoto", "Sehtest", "ausgefüllter Antrag"] },
+  kfz: { label: "Kfz-Zulassungsstelle (Auto)", tip: "Erst die Versicherung abschließen, dann zulassen.",
+    docs: ["Reisepass und Meldebescheinigung", "Zulassungsbescheinigung Teil I und II", "eVB-Nummer der Versicherung", "SEPA-Mandat für die Kfz-Steuer", "TÜV-Bericht (Hauptuntersuchung)", "Geld für Gebühr und Kennzeichen"] },
+  bank: { label: "Bank (Girokonto)", tip: "Viele Online-Banken eröffnen Konten per Videoident.",
+    docs: ["Reisepass", "Anmeldebestätigung", "Aufenthaltstitel (für Nicht-EU-Bürger)", "Arbeitsvertrag oder Studiennachweis (manchmal)", "Steuer-ID (manchmal)"] },
+  rundfunk: { label: "Beitragsservice (Rundfunkbeitrag)", tip: "Der Beitrag gilt pro Wohnung, nicht pro Person.",
+    docs: ["Adresse der Wohnung", "Einzugsdatum", "IBAN für den Einzug", "Beitragsnummer, falls ein Brief kam"] },
+  schule: { label: "Schule / Kita (Kinder)", tip: "Kita-Plätze früh suchen.",
+    docs: ["Geburtsurkunde des Kindes", "Reisepässe der Eltern", "Anmeldebestätigung", "Impfausweis mit Masernnachweis", "letzte Zeugnisse mit Übersetzung"] },
+};
+
+const guideLabel = (g) => (lang === "de" ? GUIDES_DE[g.id].label : g.label);
+const guideTip = (g) => (lang === "de" ? GUIDES_DE[g.id].tip : g.tip);
+const guideDocs = (g) => (lang === "de" ? GUIDES_DE[g.id].docs : g.docs);
+
+// "anmeldung:0" → текст документа на текущем языке; обычный текст остаётся как есть
+function docLabel(key) {
+  const m = REF_RE.exec(key);
+  const g = m && ALL_GUIDES.find((x) => x.id === m[1]);
+  return (g && guideDocs(g)[Number(m[2])]) || key;
+}
+
+// Ведомства, на которые ссылаются документы дела
+function guidesOf(task) {
+  const ids = [];
+  for (const d of task.docs || []) {
+    const m = REF_RE.exec(d.text);
+    if (m && !ids.includes(m[1])) ids.push(m[1]);
+  }
+  return ids.map((id) => ALL_GUIDES.find((g) => g.id === id)).filter(Boolean);
+}
+const tipsOf = (task) => guidesOf(task).map(guideTip).join(" | ");
+
+// Дата ГГГГ-ММ-ДД как местная (new Date("2026-11-07") читает её как UTC и в США сдвигает на день)
+function parseLocalDate(str) {
+  const [y, m, d] = str.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+// Старые данные (русский текст внутри дел) превращаем в ссылки
+function migrateTask(task) {
+  const note = task.note || "";
+  const found = ALL_GUIDES.filter((g) => note.includes(`${g.label}: ${g.tip}`));
+  for (const d of task.docs || []) {
+    for (const g of found) {
+      const i = g.docs.indexOf(d.text);
+      if (i >= 0) { d.text = `${g.id}:${i}`; break; }
+    }
+  }
+  for (const g of found) {
+    if ((task.docs || []).some((d) => d.text.startsWith(`${g.id}:`))) {
+      task.note = task.note.replace(`${g.label}: ${g.tip}`, "");
+    }
+  }
+  if (found.length) task.note = task.note.split("|").map((p) => p.trim()).filter(Boolean).join(" | ");
+  return task;
+}
+
+// Выпадающий список ведомств на текущем языке
+function rebuildGuideOptions() {
+  amtSelect.querySelectorAll("optgroup").forEach((g) => g.remove());
+  for (const section of AMT_GUIDES) {
+    const group = document.createElement("optgroup");
+    group.label = lang === "de" ? GROUP_DE[section.group] : section.group;
+    for (const item of section.items) {
+      const option = document.createElement("option");
+      option.value = item.id;
+      option.textContent = guideLabel(item);
+      group.appendChild(option);
+    }
+    amtSelect.appendChild(group);
+  }
+}
+
+tasks.forEach(migrateTask);
+saveTasks();
 
 // ---------- 17. Язык интерфейса: русский / немецкий ----------
 // Статичные тексты страницы: ключ = русский текст, значение = немецкий.
@@ -872,6 +992,7 @@ function applyLanguage() {
   document.querySelectorAll("[data-lang]").forEach((b) =>
     b.setAttribute("aria-pressed", String(b.dataset.lang === lang))
   );
+  rebuildGuideOptions();
   translateDom();
   updateDate();
   render(); // карточки строятся из JS, поэтому перерисовываем
@@ -880,7 +1001,7 @@ function applyLanguage() {
 document.querySelectorAll("[data-lang]").forEach((btn) =>
   btn.addEventListener("click", () => {
     lang = btn.dataset.lang;
-    localStorage.setItem(LANG_KEY, lang);
+    safeSet(LANG_KEY, lang);
     applyLanguage();
   })
 );
@@ -926,3 +1047,30 @@ function updateDate() {
 setInterval(updateDate, 30000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) updateDate(); });
 window.addEventListener("focus", updateDate);
+
+// ---------- 20. Защита от потери данных ----------
+if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); // просим браузер не чистить данные
+
+const EXPORT_KEY = "umzug-tracker-last-export";
+const REMIND_KEY = "umzug-tracker-last-reminder";
+
+// Раз в день напоминаем о копии, если дел много, а экспорта не было 14 дней
+function remindBackup() {
+  const today = new Date().toLocaleDateString("sv-SE");
+  const daysSince = (Date.now() - (Number(safeGet(EXPORT_KEY)) || 0)) / 86400000;
+  if (tasks.length < 3 || daysSince < 14 || safeGet(REMIND_KEY) === today) return;
+  safeSet(REMIND_KEY, today);
+  showToast(T("Давно не было резервной копии", "Lange keine Sicherung"), T("Экспорт", "Export"),
+    () => document.getElementById("export-btn").click());
+}
+setTimeout(remindBackup, 2000);
+
+// Высота панели ввода нужна, чтобы уведомления не перекрывали кнопки над ней
+const composerEl = document.querySelector(".composer");
+new ResizeObserver(() =>
+  document.documentElement.style.setProperty("--composer-h", `${composerEl.offsetHeight}px`)
+).observe(composerEl);
+
+// Обёртки: если память браузера недоступна, приложение не падает
+function safeGet(key) { try { return localStorage.getItem(key); } catch { return null; } }
+function safeSet(key, value) { try { localStorage.setItem(key, value); } catch { /* не страшно */ } }

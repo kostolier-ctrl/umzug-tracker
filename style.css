@@ -474,16 +474,6 @@ ul {
 .checklist label { display: flex; gap: .7rem; align-items: flex-start; min-height: 44px; padding: .4rem 0; font-size: .92rem; overflow-wrap: anywhere; }
 .checklist input { flex: none; width: 22px; height: 22px; margin: 0; accent-color: var(--accent); }
 
-#toast {
-  position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 92px); z-index: 10;
-  display: flex; align-items: center; gap: .9rem; max-width: calc(100vw - 2rem);
-  padding: .7rem 1rem; border-radius: 999px; background: #1f2933; color: #fff; font-size: .9rem;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, .25);
-  opacity: 0; pointer-events: none; transform: translate(-50%, 20px);
-  transition: opacity .25s ease, transform .3s var(--spring);
-}
-#toast.show { opacity: 1; pointer-events: auto; transform: translate(-50%, 0); }
-#toast button { padding: .2rem .4rem; color: #6ab3f3; font-weight: 600; }
 
 /* ---------- Плавающие кнопки над панелью ввода ---------- */
 ul { padding-bottom: 4.5rem; }   /* последняя карточка не прячется под кнопками */
@@ -533,3 +523,28 @@ button.menu-item:active { background: var(--press); }
 }
 .clear-btn:active { transform: scale(.88); }
 .clear-btn:disabled { opacity: .35; cursor: default; }
+
+/* ---------- Уведомления: несколько сразу, над кнопками ---------- */
+#toasts {
+  position: fixed; left: 50%; bottom: calc(var(--composer-h, 70px) + 72px); z-index: 1;
+  transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 8px;
+  width: max-content; max-width: calc(100vw - 2rem); pointer-events: none;
+}
+.toast {
+  display: flex; align-items: center; gap: .9rem; padding: .7rem 1rem; border-radius: 999px;
+  background: #1f2933; color: #fff; font-size: .9rem; pointer-events: auto;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .25); animation: toast-in .3s var(--spring) both;
+}
+.toast button { padding: .2rem .4rem; color: #6ab3f3; font-weight: 600; }
+@keyframes toast-in { from { opacity: 0; transform: translateY(14px) scale(.95); } }
+
+/* Контраст бейджей: тёмный текст на оранжевом, насыщеннее фон у синего и красного */
+.badge.blue { background: #1f6fc4; }
+.badge.red { background: #d32f2f; }
+.badge.orange { background: var(--orange); color: #2b1a00; }
+
+.checklist-tip { font-size: .8rem; line-height: 1.4; color: var(--sub); padding: .2rem 0 .4rem; }
+.checklist-tip a { color: var(--accent-text); }
+/* Уведомление не перехватывает нажатия по карточкам под ним: активна только кнопка "Отменить" */
+.toast { pointer-events: none; }
+.toast button { pointer-events: auto; }
